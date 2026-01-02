@@ -176,6 +176,98 @@ const Population = struct {
              }
          }
     }
+
+    // Serialization Logic
+    
+    pub fn get_state_size(self: *Population) usize {
+        // Size = Config (28 bytes) + Paths Data
+        // Path Data = (ID(4) + Energy(4) + Len(4) + Symbols(Len)) * PopSize
+        var size: usize = @sizeOf(Config);
+        for (self.paths) |p| {
+            size += 4 + 4 + 4 + p.symbols.len;
+        }
+        return size;
+    }
+
+    pub fn save_state(self: *Population, buffer: [*]u8, len: usize) bool {
+        const needed = self.get_state_size();
+        if (len < needed) return false;
+
+        var offset: usize = 0;
+        
+        // Save Config
+        const cfg_bytes = std.mem.asBytes(&self.config);
+        @memcpy(buffer[offset..offset+cfg_bytes.len], cfg_bytes);
+        offset += cfg_bytes.len;
+
+        // Save Paths
+        for (self.paths) |p| {
+             // ID
+             std.mem.writeInt(u32, buffer[offset..offset+4][0..4], p.id, .little);
+             offset += 4;
+             // Energy
+             const e_bits = @as(u32, @bitCast(p.energy));
+             std.mem.writeInt(u32, buffer[offset..offset+4][0..4], e_bits, .little);
+             offset += 4;
+             // Sym Len
+             const s_len = @as(u32, @intCast(p.symbols.len));
+             std.mem.writeInt(u32, buffer[offset..offset+4][0..4], s_len, .little);
+             offset += 4;
+             // Symbols
+             @memcpy(buffer[offset..offset+p.symbols.len], p.symbols);
+             offset += p.symbols.len;
+        }
+        return true;
+    }
+
+    pub fn load_state(self: *Population, buffer: [*]const u8, len: usize) bool {
+         // Basic sanity check: must at least hold config
+         if (len < @sizeOf(Config)) return false;
+
+         var offset: usize = 0;
+         
+         // Load Config
+         const cfg_ptr: *const Config = @ptrCast(@alignCast(buffer[offset..offset+@sizeOf(Config)]));
+         self.config = cfg_ptr.*;
+         offset += @sizeOf(Config);
+
+         // Re-init PRNG with new seed potentially, but usually we want to keep state? 
+         // For now, let's just respect the config loaded.
+         // self.prng = RndGen.init(@truncate(self.config.seed)); // Optional: reset PRNG? Using loaded state implies continuity.
+
+         // Load Paths
+         // Note: We assume the existing population structure (pop_size) matches the saved one 
+         // or we might overrun boundaries if they differ. For safety in this version, 
+         // we assume matching PopSize. A more robust version would re-alloc paths.
+         
+         for (self.paths) |*p| {
+             if (offset + 12 > len) return false; // Check header size
+
+             // ID
+             p.id = std.mem.readInt(u32, buffer[offset..offset+4][0..4], .little);
+             offset += 4;
+             
+             // Energy
+             const e_bits = std.mem.readInt(u32, buffer[offset..offset+4][0..4], .little);
+             p.energy = @bitCast(e_bits);
+             offset += 4;
+
+             // Sym Len
+             const s_len = std.mem.readInt(u32, buffer[offset..offset+4][0..4], .little);
+             offset += 4;
+
+             // Resize symbols if needed
+             if (s_len != p.symbols.len) {
+                 self.allocator.free(p.symbols);
+                 p.symbols = self.allocator.alloc(u8, s_len) catch return false;
+             }
+
+             if (offset + s_len > len) return false;
+             @memcpy(p.symbols, buffer[offset..offset+s_len]);
+             offset += s_len;
+         }
+         return true;
+    }
 };
 
 // --- C Exports ---
@@ -213,4 +305,25 @@ export fn ssn_get_path(ptr: ?*Population, id: u32, buffer: [*]u8, len: usize) vo
     if (ptr) |p| {
         p.get_path_bits(id, buffer, len);
     }
+}
+
+export fn ssn_get_state_size(ptr: ?*Population) usize {
+    if (ptr) |p| {
+        return p.get_state_size();
+    }
+    return 0;
+}
+
+export fn ssn_save_state(ptr: ?*Population, buffer: [*]u8, len: usize) bool {
+    if (ptr) |p| {
+        return p.save_state(buffer, len);
+    }
+    return false;
+}
+
+export fn ssn_load_state(ptr: ?*Population, buffer: [*]const u8, len: usize) bool {
+     if (ptr) |p| {
+        return p.load_state(buffer, len);
+    }
+    return false;
 }

@@ -60,7 +60,7 @@ graph TD
 We mandated a falsification test: **Online Rock-Paper-Scissors against a Regime-Switching Opponent.**
 The opponent changes strategy (Bias: Rock -> Paper -> Scissors) every 300 steps.
 
-| Metric | SSN (v1.4) | Standard NN (LSTM) |
+| Metric | SSN (v1.2) | Standard NN (LSTM) |
 | :--- | :--- | :--- |
 | **Adaptation Lag** | **~15 Steps** | 100-500+ Steps |
 | **Win Rate** | **60.7%** | ~50-55% (Slow convergence) |
@@ -76,9 +76,19 @@ The opponent changes strategy (Bias: Rock -> Paper -> Scissors) every 300 steps.
 go get github.com/Adi-Baba/SSN
 ```
 
-**Requirements**:
 *   **Go 1.21+**
-*   **Zig 0.11+** (for building the kernel) / *Pre-built DLLs provided for Windows x64.*
+*   **Zig 0.11+** (for building the kernel)
+
+## 🧪 Testing
+
+To run the integration tests (which verify the Zig kernel and Go wrapper):
+
+```bash
+make test
+# OR
+build.bat
+go test -v ./pkg/ssn
+```
 
 ---
 
@@ -89,6 +99,7 @@ package main
 
 import (
     "fmt"
+    "log"
     "github.com/Adi-Baba/SSN/pkg/ssn"
 )
 
@@ -96,28 +107,24 @@ func main() {
     // 1. Configure
     cfg := ssn.DefaultConfig()
     cfg.PopSize = 100
-    cfg.Alpha = 2.0 // Learning Rate
-    cfg.Beta  = 0.2 // Decay Rate (Forgetting)
 
     // 2. Initialize
-    net, _ := ssn.New(cfg)
+    net, err := ssn.New(cfg)
+    if err != nil {
+        log.Fatal(err)
+    }
     defer net.Close()
 
     // 3. Online Loop
-    for i := 0; i < 100; i++ {
-        // A. Select Path
-        id := net.Select()
-        path := net.GetPath(id)
-        
-        // B. Act (Your Logic Here)
-        fmt.Printf("Step %d: Selected Path %d (Bytes: %v)\n", i, id, path)
-
-        // C. Reward (-1.0 to 1.0)
-        reward := 1.0 // Assume we did something good!
-        
-        // D. Update (Learn)
-        net.Update(id, float32(reward))
+    id := net.Select()
+    net.Update(id, 1.0)
+    
+    // 4. Serialize (New Feature)
+    state, err := net.Save()
+    if err != nil {
+        log.Fatal(err)
     }
+    fmt.Printf("Saved network state (%d bytes)\n", len(state))
 }
 ```
 

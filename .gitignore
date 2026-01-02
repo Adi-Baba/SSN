@@ -15,4 +15,11 @@ ssn.exe
 Thumbs.db
 Desktop.ini
 
-# Note: Keeping .dll and results/ for verified reproducibility
+# Build Artifacts
+*.dll
+*.lib
+*.pdb
+internal/zig/zig-cache/
+internal/zig/zig-out/
+pkg/ssn/*.dll
+
