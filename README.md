@@ -31,26 +31,26 @@ The system is a hybrid:
 
 ```mermaid
 graph TD
-    subgraph "Go Application Layer"
-        Bot[Your Bot / App]
+    subgraph GoApp ["Go Application Layer"]
+        Bot["Your Bot / App"]
     end
 
-    subgraph "SSN Package (pkg/ssn)"
-        API[Go API Wrapper]
+    subgraph Pkg ["SSN Package (pkg/ssn)"]
+        API["Go API Wrapper"]
     end
 
-    subgraph "Zig High-Performance Kernel"
-        C_ABI[C Export Layer]
-        Engine[Population Engine]
-        Math[Dynamics Core (dynamics.zig)]
+    subgraph Zig ["Zig High-Performance Kernel"]
+        C_ABI["C Export Layer"]
+        Engine["Population Engine"]
+        Math["Dynamics Core (dynamics.zig)"]
     end
 
-    Bot -->|1. Select Action| API
-    Bot -->|2. Feed Reward| API
-    API <-->|CGO (Fast)| C_ABI
+    Bot -->|"1. Select Action"| API
+    Bot -->|"2. Feed Reward"| API
+    API <-->|"CGO (Fast)"| C_ABI
     C_ABI --> Engine
-    Engine -->|Geometric Decay| Math
-    Engine -->|Survivor Selection| Math
+    Engine -->|"Geometric Decay"| Math
+    Engine -->|"Survivor Selection"| Math
 ```
 
 ---
